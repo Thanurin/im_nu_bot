@@ -1,9 +1,16 @@
 import aiohttp
 import asyncio
+
 from config import VT_API_KEY
 
 
 UPLOAD_URL = "https://www.virustotal.com/api/v3/files"
+
+
+ANALYSIS_URL = (
+    "https://www.virustotal.com/api/v3/analyses/"
+)
+
 
 
 async def upload_file(file_path):
@@ -12,12 +19,19 @@ async def upload_file(file_path):
         "x-apikey": VT_API_KEY
     }
 
+
     async with aiohttp.ClientSession() as session:
 
+
+        # ==========================
         # Upload file
+        # ==========================
+
         with open(file_path, "rb") as file:
 
+
             form = aiohttp.FormData()
+
 
             form.add_field(
                 "file",
@@ -25,66 +39,165 @@ async def upload_file(file_path):
                 filename=file_path
             )
 
+
             async with session.post(
                 UPLOAD_URL,
                 headers=headers,
                 data=form
             ) as response:
 
+
                 upload_result = await response.json()
 
 
-        # Check upload error
+
+        # ==========================
+        # Error check
+        # ==========================
+
         if "error" in upload_result:
+
+
+            error_code = (
+                upload_result
+                ["error"]
+                .get("code")
+            )
+
+
+            # File already scanned before
+            if error_code == "AlreadySubmittedError":
+
+
+                return {
+                    "already_submitted": True,
+                    "message":
+                    "File already exists in VirusTotal"
+                }
+
+
             return upload_result
 
 
-        if "data" not in upload_result:
+
+
+        # ==========================
+        # Get analysis ID
+        # ==========================
+
+        analysis_id = (
+            upload_result
+            .get("data", {})
+            .get("id")
+        )
+
+
+        if not analysis_id:
+
+
             return {
                 "error": {
-                    "message": "No analysis ID returned",
-                    "details": upload_result
+                    "message":
+                    "No analysis ID returned"
                 }
             }
 
 
-        analysis_id = upload_result["data"]["id"]
 
 
-        # Wait for VirusTotal analysis
-        for i in range(10):
+        # ==========================
+        # Wait for VT result
+        # ==========================
+
+        for attempt in range(12):
+
 
             await asyncio.sleep(5)
 
 
-            check_url = (
-                f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
+
+            url = (
+                ANALYSIS_URL
+                +
+                analysis_id
             )
 
 
+
             async with session.get(
-                check_url,
+                url,
                 headers=headers
             ) as response:
+
 
                 result = await response.json()
 
 
-            if "data" in result:
 
-                status = (
-                    result["data"]
-                    ["attributes"]
-                    .get("status")
-                )
+            if "data" not in result:
+
+                continue
 
 
-                if status == "completed":
-                    return result
+
+            attributes = (
+                result
+                ["data"]
+                .get("attributes", {})
+            )
+
+
+            status = attributes.get(
+                "status"
+            )
+
+
+
+            if status == "completed":
+
+
+                return result
+
 
 
         return {
+
             "error": {
-                "message": "VirusTotal scan timeout"
+
+                "message":
+                "VirusTotal scan timeout"
+
             }
+
         }
+
+
+
+
+
+
+async def get_analysis(analysis_id):
+
+
+    headers = {
+        "x-apikey": VT_API_KEY
+    }
+
+
+    async with aiohttp.ClientSession() as session:
+
+
+        url = (
+            ANALYSIS_URL
+            +
+            analysis_id
+        )
+
+
+        async with session.get(
+            url,
+            headers=headers
+        ) as response:
+
+
+            return await response.json()
