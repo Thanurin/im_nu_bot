@@ -1,6 +1,5 @@
 import aiohttp
 import asyncio
-
 from config import VT_API_KEY
 
 
@@ -16,11 +15,12 @@ async def upload_file(file_path):
 
     async with aiohttp.ClientSession() as session:
 
+        # Upload file
         with open(file_path, "rb") as file:
 
-            data = aiohttp.FormData()
+            form = aiohttp.FormData()
 
-            data.add_field(
+            form.add_field(
                 "file",
                 file,
                 filename=file_path
@@ -30,33 +30,31 @@ async def upload_file(file_path):
             async with session.post(
                 UPLOAD_URL,
                 headers=headers,
-                data=data
+                data=form
             ) as response:
 
-                upload_result = await response.json()
+                upload_data = await response.json()
 
 
+        if "data" not in upload_data:
 
-        analysis_id = (
-            upload_result
-            ["data"]
-            ["id"]
-        )
+            raise Exception(upload_data)
 
 
-        # Wait for VirusTotal analysis
+        analysis_id = upload_data["data"]["id"]
 
+
+        # Wait VirusTotal scan
         await asyncio.sleep(15)
 
 
-        result_url = (
-            "https://www.virustotal.com/api/v3/analyses/"
-            + analysis_id
+        analysis_url = (
+            f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
         )
 
 
         async with session.get(
-            result_url,
+            analysis_url,
             headers=headers
         ) as response:
 
