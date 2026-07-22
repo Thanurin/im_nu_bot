@@ -1,4 +1,5 @@
 import os
+import asyncio
 import threading
 
 from flask import Flask
@@ -35,9 +36,7 @@ def run_web():
 
 
 
-def run_bot():
-
-    print("Starting Telegram Bot...")
+async def telegram_bot():
 
     init_database()
 
@@ -55,11 +54,32 @@ def run_bot():
     print("🛡 CyberScan Bot Started...")
 
 
-    application.run_polling()
+    await application.initialize()
+
+    await application.start()
+
+    await application.updater.start_polling()
+
+
+    while True:
+        await asyncio.sleep(10)
+
+
+
+def run_bot():
+
+    loop = asyncio.new_event_loop()
+
+    asyncio.set_event_loop(loop)
+
+    loop.run_until_complete(
+        telegram_bot()
+    )
 
 
 
 if __name__ == "__main__":
+
 
     threading.Thread(
         target=run_web,
