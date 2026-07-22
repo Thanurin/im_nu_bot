@@ -4,6 +4,7 @@ from telegram import (
     InlineKeyboardMarkup,
 )
 
+
 from telegram.ext import (
     ContextTypes,
     CommandHandler,
@@ -12,12 +13,15 @@ from telegram.ext import (
     filters,
 )
 
+
 from database import (
     add_user,
     increase_scan_count,
 )
 
+
 from vt import upload_file
+
 
 import os
 
@@ -39,12 +43,13 @@ WELCOME_TEXT = """
 
 
 
+
+
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    # Save user
     add_user(update.effective_user)
 
 
@@ -63,14 +68,11 @@ async def start(
 
 
     await update.message.reply_text(
-
         WELCOME_TEXT,
-
-        reply_markup=InlineKeyboardMarkup(
-            keyboard
-        )
-
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
 
 
 
@@ -83,26 +85,21 @@ async def donate(
 
     query = update.callback_query
 
+
     await query.answer()
 
 
     caption = """
 
-❤️ សូមថ្លែងអំណរគុណចំពោះលោកអ្នក
-
-ដែលបានជួយគាំទ្រ និងឧបត្ថម្ភខ្ញុំ។
+❤️ សូមអរគុណសម្រាប់ការគាំទ្រ!
 
 
-ការឧបត្ថម្ភរបស់លោកអ្នក
-
-គឺជាកម្លាំងចិត្តដ៏មានតម្លៃ
-
-សម្រាប់ខ្ញុំក្នុងការបន្តអភិវឌ្ឍ
-
-CyberScan Bot។
+ការឧបត្ថម្ភរបស់អ្នក
+ជួយឲ CyberScan Bot
+បន្តអភិវឌ្ឍបាន។
 
 
-សូមអរគុណ! 🙏
+🙏 Thank you!
 
 """
 
@@ -110,20 +107,20 @@ CyberScan Bot។
     with open("qr.jpg", "rb") as photo:
 
         await query.message.reply_photo(
-
             photo=photo,
-
             caption=caption
-
         )
 
 
 
 
 
-# ==========================
-# FILE SCANNER
-# ==========================
+
+
+# ======================
+# VIRUSTOTAL SCANNER
+# ======================
+
 
 async def scan_file(
     update: Update,
@@ -140,9 +137,7 @@ async def scan_file(
 
 
     status = await update.message.reply_text(
-
         "🔍 កំពុងទទួល File..."
-
     )
 
 
@@ -164,23 +159,73 @@ async def scan_file(
 
 
     await status.edit_text(
-
-        "☁️ កំពុង Upload ទៅ VirusTotal..."
-
+        "☁️ Upload ទៅ VirusTotal..."
     )
 
 
 
     try:
 
+
         result = await upload_file(
             file_path
         )
 
 
-        await status.edit_text(
+        stats = (
+            result
+            ["data"]
+            ["attributes"]
+            ["stats"]
+        )
 
-            f"""
+
+
+        malicious = stats.get(
+            "malicious",
+            0
+        )
+
+
+        suspicious = stats.get(
+            "suspicious",
+            0
+        )
+
+
+        harmless = stats.get(
+            "harmless",
+            0
+        )
+
+
+        undetected = stats.get(
+            "undetected",
+            0
+        )
+
+
+
+        if malicious > 0:
+
+            verdict = "🚨 MALWARE DETECTED"
+
+
+        elif suspicious > 0:
+
+            verdict = "⚠️ Suspicious"
+
+
+        else:
+
+            verdict = "✅ CLEAN"
+
+
+
+
+
+        report = f"""
+
 🛡 CyberScan Report
 
 
@@ -188,21 +233,47 @@ async def scan_file(
 {document.file_name}
 
 
-📊 VirusTotal Result:
+🔍 Result:
+
+{verdict}
 
 
-{result}
+📊 Detection:
+
+
+🚨 Malicious:
+{malicious}
+
+
+⚠️ Suspicious:
+{suspicious}
+
+
+✅ Clean:
+{harmless}
+
+
+❓ Undetected:
+{undetected}
+
+
+
+Powered by VirusTotal
 
 """
 
+
+
+        await status.edit_text(
+            report
         )
 
 
-        # Increase scan count
 
         increase_scan_count(
             update.effective_user.id
         )
+
 
 
     except Exception as e:
@@ -234,48 +305,32 @@ Error:
 
 
 
+
+
 def setup_handlers(app):
 
 
-    # Start command
-
     app.add_handler(
-
         CommandHandler(
             "start",
             start
         )
-
     )
 
 
 
-    # Donation button
-
     app.add_handler(
-
         CallbackQueryHandler(
-
             donate,
-
             pattern="donate"
-
         )
-
     )
 
 
 
-    # File scanner
-
     app.add_handler(
-
         MessageHandler(
-
             filters.Document.ALL,
-
             scan_file
-
         )
-
     )
