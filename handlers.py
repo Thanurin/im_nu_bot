@@ -4,7 +4,6 @@ from telegram import (
     InlineKeyboardMarkup,
 )
 
-
 from telegram.ext import (
     ContextTypes,
     CommandHandler,
@@ -13,17 +12,15 @@ from telegram.ext import (
     filters,
 )
 
-
 from database import (
     add_user,
     increase_scan_count,
 )
 
-
 from vt import upload_file
 
-
 import os
+import asyncio
 
 
 
@@ -34,36 +31,30 @@ WELCOME_TEXT = """
 តើមានអ្វីសង្ស័យឲខ្ញុំជួយមែនទេ?
 
 
-📄 សូមផ្ញើ ឬ Forward File មកខ្ញុំ។
+📄 សូមផ្ញើ File មកខ្ញុំ។
 
 ខ្ញុំនឹងស្កេនវាជាមួយ VirusTotal
-ហើយបង្ហាញលទ្ធផលឲអ្នកភ្លាមៗ។
+ហើយបង្ហាញលទ្ធផលឲអ្នក។
+
+
+🛡 Powered by VirusTotal
 
 """
 
 
 
-
-
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     add_user(update.effective_user)
 
 
     keyboard = [
-
         [
-
             InlineKeyboardButton(
                 "❤️ ជួយឧបត្ថម្ភខ្ញុំ",
                 callback_data="donate"
             )
-
         ]
-
     ]
 
 
@@ -75,28 +66,20 @@ async def start(
 
 
 
-
-
-
-async def donate(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
-
 
     await query.answer()
 
 
     caption = """
 
-❤️ សូមអរគុណសម្រាប់ការគាំទ្រ!
-
+❤️ អរគុណសម្រាប់ការគាំទ្រ!
 
 ការឧបត្ថម្ភរបស់អ្នក
 ជួយឲ CyberScan Bot
-បន្តអភិវឌ្ឍបាន។
+បន្តអភិវឌ្ឍ។
 
 
 🙏 Thank you!
@@ -115,17 +98,12 @@ async def donate(
 
 
 
-
-
 # ======================
 # VIRUSTOTAL SCANNER
 # ======================
 
 
-async def scan_file(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def scan_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     document = update.message.document
@@ -172,11 +150,79 @@ async def scan_file(
         )
 
 
-        stats = (
+
+        # Check VirusTotal error
+
+        if "error" in result:
+
+            message = result["error"].get(
+                "message",
+                "Unknown error"
+            )
+
+
+            await status.edit_text(
+                f"""
+⚠️ VirusTotal Notice
+
+{message}
+
+Please try again later.
+"""
+            )
+
+            return
+
+
+
+        # Get analysis id
+
+        analysis_id = (
             result
-            ["data"]
-            ["attributes"]
-            ["stats"]
+            .get("data", {})
+            .get("id")
+        )
+
+
+
+        if not analysis_id:
+
+            await status.edit_text(
+                "❌ Cannot get VirusTotal analysis ID"
+            )
+
+            return
+
+
+
+        await status.edit_text(
+            "⏳ កំពុងរង់ចាំ VirusTotal វិភាគ..."
+        )
+
+
+
+        # wait for VT processing
+
+        await asyncio.sleep(15)
+
+
+
+        # ask VT again
+
+        from vt import get_analysis
+
+
+        analysis = await get_analysis(
+            analysis_id
+        )
+
+
+
+        stats = (
+            analysis
+            .get("data", {})
+            .get("attributes", {})
+            .get("stats", {})
         )
 
 
@@ -186,18 +232,15 @@ async def scan_file(
             0
         )
 
-
         suspicious = stats.get(
             "suspicious",
             0
         )
 
-
         harmless = stats.get(
             "harmless",
             0
         )
-
 
         undetected = stats.get(
             "undetected",
@@ -213,14 +256,12 @@ async def scan_file(
 
         elif suspicious > 0:
 
-            verdict = "⚠️ Suspicious"
+            verdict = "⚠️ SUSPICIOUS"
 
 
         else:
 
             verdict = "✅ CLEAN"
-
-
 
 
 
@@ -261,7 +302,6 @@ async def scan_file(
 Powered by VirusTotal
 
 """
-
 
 
         await status.edit_text(
