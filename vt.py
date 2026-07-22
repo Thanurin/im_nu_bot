@@ -15,12 +15,11 @@ async def upload_file(file_path):
 
     async with aiohttp.ClientSession() as session:
 
-        # Upload file
         with open(file_path, "rb") as file:
 
-            form = aiohttp.FormData()
+            data = aiohttp.FormData()
 
-            form.add_field(
+            data.add_field(
                 "file",
                 file,
                 filename=file_path
@@ -30,36 +29,31 @@ async def upload_file(file_path):
             async with session.post(
                 UPLOAD_URL,
                 headers=headers,
-                data=form
+                data=data
             ) as response:
 
-                upload_data = await response.json()
+                result = await response.json()
 
 
-        if "data" not in upload_data:
-
-            raise Exception(upload_data)
-
-
-        analysis_id = upload_data["data"]["id"]
+                if "error" in result:
+                    return result
 
 
-        # Wait VirusTotal scan
+                analysis_id = result["data"]["id"]
+
+
+        # wait for scan result
         await asyncio.sleep(15)
 
 
-        analysis_url = (
+        result_url = (
             f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
         )
 
 
         async with session.get(
-            analysis_url,
+            result_url,
             headers=headers
         ) as response:
 
-
-            result = await response.json()
-
-
-            return result
+            return await response.json()
