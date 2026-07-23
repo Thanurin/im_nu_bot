@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+import json
 from config import VT_API_KEY
 
 
@@ -12,10 +13,8 @@ async def upload_file(file_path):
         "x-apikey": VT_API_KEY
     }
 
-
     async with aiohttp.ClientSession() as session:
 
-        # Upload file
         with open(file_path, "rb") as file:
 
             form = aiohttp.FormData()
@@ -26,25 +25,32 @@ async def upload_file(file_path):
                 filename=file_path
             )
 
-
             async with session.post(
                 UPLOAD_URL,
                 headers=headers,
                 data=form
             ) as response:
 
-                upload_data = await response.json()
+                text = await response.text()
+
+                print("VT Upload Status:", response.status)
+                print("VT Response:", text)
+
+                try:
+                    upload_data = json.loads(text)
+                except:
+                    raise Exception(
+                        f"VirusTotal returned non JSON:\n{text}"
+                    )
 
 
         if "data" not in upload_data:
-
             raise Exception(upload_data)
 
 
         analysis_id = upload_data["data"]["id"]
 
 
-        # Wait VirusTotal scan
         await asyncio.sleep(15)
 
 
@@ -58,8 +64,12 @@ async def upload_file(file_path):
             headers=headers
         ) as response:
 
+            text = await response.text()
 
-            result = await response.json()
+            print("Analysis Status:", response.status)
+            print("Analysis Response:", text)
 
+            result = json.loads(text)
 
             return result
+        
