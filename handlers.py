@@ -44,7 +44,7 @@ WELCOME_TEXT = """
 ខ្ញុំនឹងស្កេនវាជាមួយ VirusTotal
 ហើយបង្ហាញលទ្ធផលឲអ្នក។
 
-
+សូមទាក់ទងមកខ្ញុំផ្ទាល់ប្រសិនបើ bot telegram នេះមានបញ្ហា​ @Bl4ck_Cyb4r
 🛡 Powered by VirusTotal
 
 """
